@@ -7,6 +7,7 @@ import {
   PageResponse,
   FiltroProducto,
   BusquedaProductoParams,
+  TipoCompatibilidad,
 } from '../modelos/catalogo';
 
 @Injectable({
@@ -85,6 +86,19 @@ export class CatalogoService {
 
   despublicar(id: string): Observable<ProductoResponse> {
     return this.http.put<ProductoResponse>(`${this.baseUrl}/${id}/despublicar`, {});
+  }
+
+  indicarCompatibilidad(id: string, tipo: TipoCompatibilidad, modelo: string): Observable<ProductoResponse> {
+    return this.http.put<ProductoResponse>(
+      `${this.baseUrl}/${encodeURIComponent(id)}/compatibilidades`, { tipo, modelo },
+    );
+  }
+
+  retirarCompatibilidad(id: string, tipo: TipoCompatibilidad, modelo: string): Observable<ProductoResponse> {
+    const params = new HttpParams().set('tipo', tipo).set('modelo', modelo);
+    return this.http.delete<ProductoResponse>(
+      `${this.baseUrl}/${encodeURIComponent(id)}/compatibilidades`, { params },
+    );
   }
 
   eliminar(id: string): Observable<void> {
