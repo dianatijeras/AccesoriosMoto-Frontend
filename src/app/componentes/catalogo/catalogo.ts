@@ -111,6 +111,10 @@ export class Catalogo implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.route.snapshot.data['abrirFormularioProducto'] && this.authService.esAdmin()) {
+      this.abrirModalCrear();
+    }
+
     this.route.queryParams.subscribe((params) => {
       if (params['categoria']) {
         const cat = params['categoria'].toUpperCase();
