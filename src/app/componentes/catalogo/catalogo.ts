@@ -1,4 +1,4 @@
-﻿import { Subscription } from 'rxjs';
+﻿import { finalize, Subscription } from 'rxjs';
 import { Component, DestroyRef, OnInit, signal, inject, HostListener } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -310,6 +310,50 @@ export class Catalogo implements OnInit {
       error: (err) => {
         this.cargando.set(false);
         this.error.set('Error al eliminar producto: ' + (err.error?.mensaje || err.message));
+      },
+    });
+  }
+
+  readonly compatibilidadActiva = signal<{ producto: ProductoResponse; tipo: TipoCompatibilidad } | null>(null);
+  readonly guardandoCompatibilidad = signal(false);
+  readonly modeloCompatible = this.formBuilder.control('', [Validators.required, Validators.pattern(/\S/)]);
+
+  abrirCompatibilidad(producto: ProductoResponse): void {
+    if (!this.authService.esAdmin() || producto.estadoPublicacion === 'ELIMINADO') return;
+    const tipos: Partial<Record<string, TipoCompatibilidad>> = { Baul: 'MOTO', Visor: 'CASCO' };
+    const tipo = tipos[producto.tipo];
+    if (!tipo) return;
+
+    this.modeloCompatible.reset('');
+    this.compatibilidadActiva.set({ producto, tipo });
+  }
+
+  cerrarCompatibilidad(): void {
+    if (!this.guardandoCompatibilidad()) this.compatibilidadActiva.set(null);
+  }
+
+  gestionarCompatibilidad(retirar = false): void {
+    const seleccion = this.compatibilidadActiva();
+    if (!seleccion || !this.authService.esAdmin() || this.guardandoCompatibilidad() || this.modeloCompatible.invalid) return;
+
+    const { producto, tipo } = seleccion;
+    const modelo = this.modeloCompatible.value.trim();
+    const solicitud = retirar
+      ? this.catalogoService.retirarCompatibilidad(producto.id, tipo, modelo)
+      : this.catalogoService.indicarCompatibilidad(producto.id, tipo, modelo);
+
+    this.guardandoCompatibilidad.set(true);
+    solicitud.pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.guardandoCompatibilidad.set(false)),
+    ).subscribe({
+      next: () => this.avisos.exito(retirar ? 'Compatibilidad retirada.' : 'Compatibilidad registrada.'),
+      error: (err: HttpErrorResponse) => {
+        if (err.status === 401) return;
+        const mensaje = err.error?.mensaje;
+        this.avisos.error(typeof mensaje === 'string' && mensaje
+          ? mensaje
+          : 'No se pudo guardar el cambio de compatibilidad.');
       },
     });
   }
