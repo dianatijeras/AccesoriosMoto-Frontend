@@ -1,4 +1,4 @@
-import { Component, inject, signal, ViewContainerRef } from '@angular/core';
+import { Component, computed, inject, signal, ViewContainerRef } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -9,6 +9,7 @@ import { ComprasService } from './servicios/compras';
 import { ImagenesProductoService } from './servicios/imagenes-producto';
 import { ProductoResponse } from './modelos/catalogo';
 import { AvisoComponent } from './componentes/avisos/avisos';
+import { CatalogoService } from './servicios/catalogo';
 
 @Component({
   selector: 'app-root',
@@ -23,10 +24,18 @@ export class App {
   public carritoService = inject(CarritoService);
   public comprasService = inject(ComprasService);
   public imagenesService = inject(ImagenesProductoService);
+  readonly catalogoService = inject(CatalogoService);
   private router = inject(Router);
+
+  readonly marcasCascos = computed(() => this.catalogoService.opcionesCatalogo('marca', ['Casco']));
+  readonly marcasTextil = computed(() => this.catalogoService.opcionesCatalogo('marca', ['Chaqueta', 'Guantes', 'Impermeable']));
+  readonly marcasAccesorios = computed(() => this.catalogoService.opcionesCatalogo('marca', ['Baul', 'Intercomunicador', 'SoporteCelular']));
+  readonly marcasVisores = computed(() => this.catalogoService.opcionesCatalogo('marca', ['Visor']));
+  readonly coloresCascos = computed(() => this.catalogoService.opcionesCatalogo('color', ['Casco']));
 
   // Control del Mega Menú
   menuAbierto = signal<string | null>(null);
+  menuMovilAbierto = signal(false);
 
   // Buscador integrado en el header
   busquedaHeader = '';
@@ -47,6 +56,16 @@ export class App {
 
   cerrarMenu(): void {
     this.menuAbierto.set(null);
+  }
+
+  alternarMenuMovil(): void {
+    this.cerrarMenu();
+    this.menuMovilAbierto.update((abierto) => !abierto);
+  }
+
+  cerrarMenuMovil(): void {
+    if (this.menuMovilAbierto()) this.cerrarMenu();
+    this.menuMovilAbierto.set(false);
   }
 
   toggleBuscador(): void {
