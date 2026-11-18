@@ -1,4 +1,4 @@
-﻿import { finalize, Subscription } from 'rxjs';
+﻿import { finalize, forkJoin, map, of, Subscription, switchMap } from 'rxjs';
 import { Component, DestroyRef, OnInit, signal, inject, HostListener } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -152,6 +152,11 @@ export class Catalogo implements OnInit {
   }
 
   cargarProductos(numPagina: number = 0): void {
+    if (this.esCategoriaAgrupada()) {
+      this.cargarProductosPorCategoria(numPagina);
+      return;
+    }
+
     this.solicitudProductos?.unsubscribe();
     this.cargando.set(true);
     this.error.set(null);
@@ -182,6 +187,119 @@ export class Catalogo implements OnInit {
         this.cargando.set(false);
       },
     });
+  }
+
+  private esCategoriaAgrupada(): boolean {
+    return ['CASCOS', 'TEXTIL', 'ACCESORIOS', 'REPUESTOS'].includes(this.categoriaActiva());
+  }
+
+  private cargarProductosPorCategoria(numPagina: number = 0): void {
+    this.solicitudProductos?.unsubscribe();
+    this.cargando.set(true);
+    this.error.set(null);
+
+    const { texto, precioMinimo, precioMaximo, ...filtros } = this.filtrosAplicados;
+    const tamanoConsulta = 50;
+    const precios = { precioMinimo, precioMaximo, moneda: 'COP' };
+
+    const crearSolicitud = (paginaConsulta: number) =>
+      texto
+        ? this.catalogoService.buscarPorTexto({
+            texto,
+            ...precios,
+            pagina: paginaConsulta,
+            tamano: tamanoConsulta,
+          })
+        : this.catalogoService.listar({
+            ...filtros,
+            ...precios,
+            pagina: paginaConsulta,
+            tamano: tamanoConsulta,
+          });
+
+    this.solicitudProductos = crearSolicitud(0)
+      .pipe(
+        switchMap((primeraPagina) => {
+          if (primeraPagina.totalPages <= 1) {
+            return of(primeraPagina.content);
+          }
+
+          const paginasRestantes = Array.from(
+            { length: primeraPagina.totalPages - 1 },
+            (_, indice) => crearSolicitud(indice + 1)
+          );
+
+          return forkJoin(paginasRestantes).pipe(
+            map((respuestas) => [
+              ...primeraPagina.content,
+              ...respuestas.flatMap((respuesta) => respuesta.content),
+            ])
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe({
+        next: (content) => {
+          this.actualizarMarcasYColores(content);
+
+          let filtrados = content;
+          if (!this.authService.esAdmin()) {
+            filtrados = filtrados.filter((producto) => producto.estadoPublicacion === 'PUBLICADO');
+          }
+          filtrados = this.filtrarPorCategoria(filtrados);
+
+          const total = filtrados.length;
+          const tamanoPagina = this.tamano();
+          const totalPaginas = total === 0 ? 0 : Math.ceil(total / tamanoPagina);
+          const paginaValida = totalPaginas === 0
+            ? 0
+            : Math.min(Math.max(0, numPagina), totalPaginas - 1);
+          const inicio = paginaValida * tamanoPagina;
+
+          this.productos.set(filtrados.slice(inicio, inicio + tamanoPagina));
+          this.totalElementos.set(total);
+          this.totalPaginas.set(totalPaginas);
+          this.pagina.set(paginaValida);
+          this.cargando.set(false);
+        },
+        error: (err) => {
+          this.error.set('No se pudo conectar con el catálogo: ' + (err.error?.mensaje || err.message));
+          this.cargando.set(false);
+        },
+      });
+  }
+
+  private filtrarPorCategoria(items: ProductoResponse[]): ProductoResponse[] {
+    const categoria = this.categoriaActiva();
+
+    if (categoria === 'CASCOS') {
+      return items.filter((producto) => producto.tipo?.toLowerCase().includes('casco'));
+    }
+
+    if (categoria === 'TEXTIL') {
+      return items.filter((producto) => {
+        const tipo = producto.tipo?.toLowerCase() || '';
+        return tipo.includes('chaqueta') || tipo.includes('guante') || tipo.includes('impermeable');
+      });
+    }
+
+    if (categoria === 'ACCESORIOS') {
+      return items.filter((producto) => {
+        const tipo = producto.tipo?.toLowerCase() || '';
+        return (
+          tipo.includes('baul') ||
+          tipo.includes('baúl') ||
+          tipo.includes('soporte') ||
+          tipo.includes('intercom')
+        );
+      });
+    }
+
+    if (categoria === 'REPUESTOS') {
+      return items.filter((producto) => producto.tipo?.toLowerCase().includes('visor'));
+    }
+
+    return items;
   }
 
   private actualizarMarcasYColores(items: ProductoResponse[]): void {
