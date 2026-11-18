@@ -1,59 +1,86 @@
-# AccesoriosMotoFront
+# AccesoriosMoto
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.29.
+Tienda de accesorios para motociclistas. Los compradores pueden explorar el catálogo, iniciar sesión, guardar favoritos y realizar pedidos desde el carrito.
+Los administradores pueden registrar, publicar, despublicar y eliminar productos del catálogo.
 
-## Development server
+## Integrantes
 
-To start a local development server, run:
+- Miguel Angel Marin Montes
+- Juan Jose Suarez Moncaleano
+- Diana Maria Garcia Alzate
 
-```bash
-ng serve
+## Tecnologías
+
+- **Frontend** · Angular 21, TypeScript 5.9, Bootstrap 5.3.9 y RxJS 7.8.
+- **Backend** · Java 21, Spring Boot 4.1.1, Spring Security, JWT, Gradle y H2 en desarrollo.
+
+## Requisitos previos
+
+- Node.js 24 y npm. El proyecto declara npm 11.6.2.
+- JDK 21 para el backend. El repositorio incluye Gradle Wrapper.
+- Backend disponible en `http://localhost:8080` para probar la integración.
+
+## Ejecutar el backend
+
+Desde la raíz del repositorio backend, ejecuta el comando de tu sistema.
+
+**Windows (PowerShell)**
+
+```powershell
+.\gradlew.bat bootRun
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+**Linux o macOS**
 
 ```bash
-ng generate component component-name
+./gradlew bootRun
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+El backend queda disponible en `http://localhost:8080`. Inícialo antes del frontend para probar la integración completa.
+
+## Ejecutar el frontend
+
+Desde la raíz del repositorio frontend, instala las dependencias e inicia el servidor de desarrollo.
 
 ```bash
-ng generate --help
+npm install
+npm start
 ```
 
-## Building
+Abre `http://localhost:4200`. El frontend consume la API en `http://localhost:8080`.
 
-To build the project run:
+## Usuarios de prueba
 
-```bash
-ng build
-```
+El backend crea estas cuentas de demostración al arrancar si sus correos aún no existen y `DATOS_PRUEBA_ENABLED` está activo, como ocurre por defecto.
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+| Rol | Correo | Contraseña |
+| --- | --- | --- |
+| ADMINISTRADOR | `admin@moto.com` | `admin123` |
+| COMPRADOR | `comprador@moto.com` | `comprador123` |
 
-## Running unit tests
+## Pantallas principales
 
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
+- **Inicio** · `/` o `/inicio`.
+- **Inicio de sesión y registro** · `/login`.
+- **Catálogo** · `/catalogo`.
+- **Carrito y favoritos** · paneles disponibles desde la barra de navegación.
+- **Administración de productos** · acciones y formulario de alta dentro del catálogo. `/catalogo/nuevo` es una entrada protegida que abre el formulario para administradores.
 
-```bash
-ng test
-```
+## Funcionalidades principales
 
-## Running end-to-end tests
+- Autenticación JWT, control de sesión mediante guards y redirección al login cuando una petición protegida devuelve HTTP 401.
+- Catálogo con datos reales, búsqueda por texto y paginación en el backend.
+- Carrito, favoritos y creación de pedidos para compradores.
+- Alta de productos con formulario reactivo y publicación automática. El catálogo también permite publicar, despublicar y eliminar productos como administrador.
+- Avisos globales para el alta de productos y el vencimiento de sesión.
+- Diseño responsive con Bootstrap, con menú desplegable y catálogo adaptado a pantallas pequeñas.
 
-For end-to-end (e2e) testing, run:
+## Arquitectura frontend
 
-```bash
-ng e2e
-```
+Estructura de `src/app`.
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- `componentes/` contiene las pantallas y los elementos reutilizables.
+- `servicios/` concentra las llamadas a la API y el estado compartido.
+- `modelos/` define las interfaces y tipos usados por la aplicación.
+- `interceptores/` adjunta el JWT y maneja las respuestas HTTP 401 de peticiones protegidas.
+- `guards/` controla el acceso a rutas según el estado de sesión.

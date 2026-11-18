@@ -1441,6 +1441,43 @@
 }
 
 @media (max-width: 1024px) {
-  .catalog-body { grid-template-columns: 1fr; }
+  .catalog-body { grid-template-columns: minmax(0, 1fr); }
   .catalog-sidebar { position: static; }
+
+  .products-top-bar,
+  .top-bar-info,
+  .top-bar-admin-actions,
+  .page-numbers-group {
+    flex-wrap: wrap;
+  }
+
+  .products-top-bar {
+    gap: 0.75rem;
+  }
+
+  .catalog-sidebar input,
+  .catalog-sidebar select,
+  .page-size-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .price-input {
+    flex: 1 1 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .products-top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .top-bar-admin-actions {
+    gap: 0.75rem;
+  }
+
+  .products-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

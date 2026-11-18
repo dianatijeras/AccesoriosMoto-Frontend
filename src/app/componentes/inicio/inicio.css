@@ -490,6 +490,17 @@
   }
   .card-hero-helmet {
     grid-column: span 1;
+    height: auto;
+    min-height: 300px;
+  }
+  .card-hero-helmet .mosaic-content {
+    width: 100%;
+    min-width: 0;
+    padding: 1.25rem;
+    overflow-wrap: anywhere;
+  }
+  .mosaic-title {
+    font-size: clamp(1.4rem, 7vw, 2rem);
   }
   .featured-grid {
     grid-template-columns: 1fr;
