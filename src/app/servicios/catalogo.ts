@@ -1,6 +1,6 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable } from 'rxjs';
 import {
   ProductoResponse,
   ProductoVentasResponse,
@@ -15,53 +15,8 @@ import {
 })
 export class CatalogoService {
   private readonly baseUrl = 'http://localhost:8080/api/productos';
-  private readonly opcionesObservadas = signal(new Map<string, Pick<ProductoResponse, 'tipo' | 'marca' | 'color'>>());
 
   constructor(private http: HttpClient) {}
-
-  opcionesCatalogo(campo: 'marca' | 'color', tipos?: readonly string[]): string[] {
-    const valores = new Set<string>();
-    for (const producto of this.opcionesObservadas().values()) {
-      if (tipos && !tipos.includes(producto.tipo)) continue;
-      const valor = producto[campo]?.trim();
-      if (valor) valores.add(valor);
-    }
-    return [...valores].sort();
-  }
-
-  obtenerMuestraColor(color: string): string {
-    const nombre = (color || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const c = nombre.match(/\b(?:negro|blanco|rojo|azul|gris|titanio|verde|amarillo|plata|marron|cafe|transparente|rosado|rosa|pink|naranja|morado|violeta|dorado|oro|humo)\b/)?.[0] ?? nombre;
-    if (c.includes('negro')) return '#111827';
-    if (c.includes('blanco')) return '#ffffff';
-    if (c.includes('rojo')) return '#e31837';
-    if (c.includes('azul')) return '#1d4ed8';
-    if (c.includes('gris') || c.includes('asfalto')) return '#6b7280';
-    if (c.includes('titanio') || c.includes('nardo')) return '#475569';
-    if (c.includes('carbon')) return '#18181b';
-    if (c.includes('verde') || c.includes('oliva')) return '#15803d';
-    if (c.includes('amarillo') || c.includes('fluor') || c.includes('neon')) return '#eab308';
-    if (c.includes('plata') || c.includes('aluminio') || c.includes('metal')) return '#cbd5e1';
-    if (c.includes('marron') || c.includes('cafe') || c.includes('arena')) return '#78350f';
-    if (c === 'rosado' || c === 'rosa' || c === 'pink') return '#ec4899';
-    if (c === 'naranja') return '#f97316';
-    if (c === 'morado' || c === 'violeta') return '#7c3aed';
-    if (c === 'dorado' || c === 'oro') return '#d4a017';
-    if (c === 'humo') return '#374151';
-    if (c.includes('transparente')) return '#f8fafc';
-    return '#9ca3af';
-  }
-
-  private registrarOpciones(productos: ProductoResponse[]): void {
-    this.opcionesObservadas.update((actuales) => {
-      const observadas = new Map(actuales);
-      for (const { id, tipo, marca, color, estadoPublicacion } of productos) {
-        if (estadoPublicacion === 'PUBLICADO') observadas.set(id, { tipo, marca, color });
-        else observadas.delete(id);
-      }
-      return observadas;
-    });
-  }
 
   listar(filtro: FiltroProducto = {}): Observable<PageResponse<ProductoResponse>> {
     let params = new HttpParams();
@@ -88,9 +43,7 @@ export class CatalogoService {
     if (filtro.tamano !== undefined && filtro.tamano !== null)
       params = params.set('tamano', filtro.tamano.toString());
 
-    return this.http.get<PageResponse<ProductoResponse>>(this.baseUrl, { params }).pipe(
-      tap(({ content }) => this.registrarOpciones(content)),
-    );
+    return this.http.get<PageResponse<ProductoResponse>>(this.baseUrl, { params });
   }
 
   buscarPorTexto(paramsFiltro: BusquedaProductoParams = {}): Observable<PageResponse<ProductoResponse>> {
@@ -115,9 +68,7 @@ export class CatalogoService {
     if (paramsFiltro.tamano !== undefined && paramsFiltro.tamano !== null)
       params = params.set('tamano', paramsFiltro.tamano.toString());
 
-    return this.http.get<PageResponse<ProductoResponse>>(`${this.baseUrl}/buscar`, { params }).pipe(
-      tap(({ content }) => this.registrarOpciones(content)),
-    );
+    return this.http.get<PageResponse<ProductoResponse>>(`${this.baseUrl}/buscar`, { params });
   }
 
   obtenerPorId(id: string): Observable<ProductoResponse> {
