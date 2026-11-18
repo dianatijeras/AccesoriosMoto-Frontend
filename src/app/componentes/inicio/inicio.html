@@ -84,7 +84,7 @@
   <section class="brands-strip-section">
     <div class="section-container">
       <div class="brands-track">
-        @for (b of marcas; track b) {
+        @for (b of marcas(); track b) {
           <a
             [routerLink]="['/catalogo']"
             [queryParams]="{ marca: b }"

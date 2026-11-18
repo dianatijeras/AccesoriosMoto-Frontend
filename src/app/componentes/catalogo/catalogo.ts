@@ -1,4 +1,4 @@
-﻿import { Subscription } from 'rxjs';
+﻿import { finalize, Subscription } from 'rxjs';
 import { Component, DestroyRef, OnInit, signal, inject, HostListener } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
@@ -62,16 +62,8 @@ export class Catalogo implements OnInit {
   compatibilidadTipo: '' | TipoCompatibilidad = '';
   compatibilidadModelo = '';
 
-  // Lista completa de marcas (se auto-complementa con la BD)
-  marcasDisponibles: string[] = [
-    'AGV', 'Alpinestars', 'Bell', 'Cardo', 'Cyclone', 'Dainese', 'FreedConn',
-    'Givi', 'HJC', 'Kappa', 'LS2', 'Motowolf', 'Quad Lock', 'RAM Mounts',
-    'Rainwear', 'Revit', 'Sena', 'Shad', 'Shark', 'Shoei'
-  ];
-
-  coloresDisponibles: string[] = [
-    'Negro', 'Blanco', 'Azul', 'Rojo', 'Gris', 'Titanio', 'Verde', 'Amarillo', 'Plata', 'Carbono'
-  ];
+  marcasDisponibles: string[] = [];
+  coloresDisponibles: string[] = [];
 
   // Estado de los selectores desplegables con scrollbar
   dropdownMarcasAbierto = signal<boolean>(false);
@@ -100,20 +92,7 @@ export class Catalogo implements OnInit {
   }
 
   obtenerMuestraColor(color: string): string {
-    const c = (color || '').toLowerCase();
-    if (c.includes('negro')) return '#111827';
-    if (c.includes('blanco')) return '#ffffff';
-    if (c.includes('rojo')) return '#e31837';
-    if (c.includes('azul')) return '#1d4ed8';
-    if (c.includes('gris') || c.includes('asfalto')) return '#6b7280';
-    if (c.includes('titanio') || c.includes('nardo')) return '#475569';
-    if (c.includes('carbon')) return '#18181b';
-    if (c.includes('verde') || c.includes('oliva')) return '#15803d';
-    if (c.includes('amarillo') || c.includes('fluor') || c.includes('neon')) return '#eab308';
-    if (c.includes('plata') || c.includes('metal')) return '#cbd5e1';
-    if (c.includes('marron') || c.includes('arena')) return '#78350f';
-    if (c.includes('transparente')) return '#f8fafc';
-    return '#9ca3af';
+    return this.catalogoService.obtenerMuestraColor(color);
   }
 
   ngOnInit(): void {
@@ -310,6 +289,50 @@ export class Catalogo implements OnInit {
       error: (err) => {
         this.cargando.set(false);
         this.error.set('Error al eliminar producto: ' + (err.error?.mensaje || err.message));
+      },
+    });
+  }
+
+  readonly compatibilidadActiva = signal<{ producto: ProductoResponse; tipo: TipoCompatibilidad } | null>(null);
+  readonly guardandoCompatibilidad = signal(false);
+  readonly modeloCompatible = this.formBuilder.control('', [Validators.required, Validators.pattern(/\S/)]);
+
+  abrirCompatibilidad(producto: ProductoResponse): void {
+    if (!this.authService.esAdmin() || producto.estadoPublicacion === 'ELIMINADO') return;
+    const tipos: Partial<Record<string, TipoCompatibilidad>> = { Baul: 'MOTO', Visor: 'CASCO' };
+    const tipo = tipos[producto.tipo];
+    if (!tipo) return;
+
+    this.modeloCompatible.reset('');
+    this.compatibilidadActiva.set({ producto, tipo });
+  }
+
+  cerrarCompatibilidad(): void {
+    if (!this.guardandoCompatibilidad()) this.compatibilidadActiva.set(null);
+  }
+
+  gestionarCompatibilidad(retirar = false): void {
+    const seleccion = this.compatibilidadActiva();
+    if (!seleccion || !this.authService.esAdmin() || this.guardandoCompatibilidad() || this.modeloCompatible.invalid) return;
+
+    const { producto, tipo } = seleccion;
+    const modelo = this.modeloCompatible.value.trim();
+    const solicitud = retirar
+      ? this.catalogoService.retirarCompatibilidad(producto.id, tipo, modelo)
+      : this.catalogoService.indicarCompatibilidad(producto.id, tipo, modelo);
+
+    this.guardandoCompatibilidad.set(true);
+    solicitud.pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.guardandoCompatibilidad.set(false)),
+    ).subscribe({
+      next: () => this.avisos.exito(retirar ? 'Compatibilidad retirada.' : 'Compatibilidad registrada.'),
+      error: (err: HttpErrorResponse) => {
+        if (err.status === 401) return;
+        const mensaje = err.error?.mensaje;
+        this.avisos.error(typeof mensaje === 'string' && mensaje
+          ? mensaje
+          : 'No se pudo guardar el cambio de compatibilidad.');
       },
     });
   }
@@ -731,4 +754,3 @@ export class Catalogo implements OnInit {
     });
   }
 }
-
