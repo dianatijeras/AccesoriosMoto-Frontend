@@ -30,7 +30,8 @@ export class CatalogoService {
   }
 
   obtenerMuestraColor(color: string): string {
-    const c = (color || '').toLowerCase();
+    const nombre = (color || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const c = nombre.match(/\b(?:negro|blanco|rojo|azul|gris|titanio|verde|amarillo|plata|marron|cafe|transparente|rosado|rosa|pink|naranja|morado|violeta|dorado|oro|humo)\b/)?.[0] ?? nombre;
     if (c.includes('negro')) return '#111827';
     if (c.includes('blanco')) return '#ffffff';
     if (c.includes('rojo')) return '#e31837';
@@ -40,8 +41,13 @@ export class CatalogoService {
     if (c.includes('carbon')) return '#18181b';
     if (c.includes('verde') || c.includes('oliva')) return '#15803d';
     if (c.includes('amarillo') || c.includes('fluor') || c.includes('neon')) return '#eab308';
-    if (c.includes('plata') || c.includes('metal')) return '#cbd5e1';
-    if (c.includes('marron') || c.includes('arena')) return '#78350f';
+    if (c.includes('plata') || c.includes('aluminio') || c.includes('metal')) return '#cbd5e1';
+    if (c.includes('marron') || c.includes('cafe') || c.includes('arena')) return '#78350f';
+    if (c === 'rosado' || c === 'rosa' || c === 'pink') return '#ec4899';
+    if (c === 'naranja') return '#f97316';
+    if (c === 'morado' || c === 'violeta') return '#7c3aed';
+    if (c === 'dorado' || c === 'oro') return '#d4a017';
+    if (c === 'humo') return '#374151';
     if (c.includes('transparente')) return '#f8fafc';
     return '#9ca3af';
   }

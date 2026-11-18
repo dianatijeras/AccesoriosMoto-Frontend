@@ -65,6 +65,31 @@ img, svg {
   flex-grow: 0;
 }
 
+@media (min-width: 992px) {
+  .main-header .header-inner {
+    position: relative;
+  }
+
+  .main-header .main-nav {
+    min-width: 0;
+    flex-wrap: wrap;
+    column-gap: clamp(0.625rem, 1.4vw, 1.5rem);
+    row-gap: 0;
+  }
+
+  .main-header .header-actions {
+    flex-shrink: 0;
+  }
+
+  .main-header .header-search-box.search-open {
+    position: absolute;
+    top: 100%;
+    right: 1.5rem;
+    margin-right: 0;
+    z-index: 1000;
+  }
+}
+
 @media (max-width: 991.98px) {
   .main-header .header-inner {
     flex-wrap: wrap;
