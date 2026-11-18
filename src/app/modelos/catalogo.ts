@@ -5,15 +5,13 @@ export interface ProductoResponse {
   color: string;
   precioMonto: number;
   precioMoneda: string;
-  estadoPublicacion: 'PUBLICADO' | 'BORRADOR' | string;
-  imagenUrl?: string;
+  estadoPublicacion: 'PUBLICADO' | 'NO_PUBLICADO' | 'ELIMINADO';
+  imagenUrl: string | null;
 }
 
 export interface ProductoVentasResponse {
-  id: string;
-  tipo: string;
-  marca: string;
-  ventas: number;
+  productoId: string;
+  cantidadVendida: number;
 }
 
 export interface PageResponse<T> {

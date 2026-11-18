@@ -9,10 +9,10 @@
   </aside>
 
   <!-- Navbar Principal Sticky -->
-  <header class="main-header">
+  <header class="main-header navbar navbar-expand-lg" (keydown.escape)="cerrarMenuMovil()">
     <div class="header-inner">
       <!-- Logo Biker Racing Estilo Inducascos -->
-      <a routerLink="/" (click)="cerrarMenu()" class="biker-brand">
+      <a routerLink="/" (click)="cerrarMenu(); cerrarMenuMovil()" class="biker-brand">
         <svg class="brand-slash" viewBox="0 0 40 40" fill="none">
           <path d="M12 4L4 36H14L22 4H12Z" fill="#E31837" />
           <path d="M24 4L16 36H16L24 4Z" fill="#ffffff" />
@@ -24,8 +24,26 @@
         </div>
       </a>
 
+      <button
+        type="button"
+        class="navbar-toggler"
+        data-bs-theme="dark"
+        aria-controls="navegacion-principal"
+        [attr.aria-expanded]="menuMovilAbierto()"
+        aria-label="Menú principal"
+        (click)="alternarMenuMovil()"
+      >
+        <span class="navbar-toggler-icon" aria-hidden="true"></span>
+      </button>
+
       <!-- Menú de Navegación con Mega Menú desplegable -->
-      <nav class="main-nav">
+      <nav
+        id="navegacion-principal"
+        class="main-nav collapse navbar-collapse"
+        aria-label="Navegación principal"
+        [class.show]="menuMovilAbierto()"
+        (click)="cerrarMenuMovil()"
+      >
         <a
           routerLink="/inicio"
           routerLinkActive="nav-active"
