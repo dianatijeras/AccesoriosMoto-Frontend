@@ -91,9 +91,6 @@
         @if (error()) {
           <div class="biker-alert alert-error">{{ error() }}</div>
         }
-        @if (authService.avisoSesionVencida(); as aviso) {
-          <div class="biker-alert alert-error" role="alert">{{ aviso }}</div>
-        }
 
         <!-- FORMULARIO DE LOGIN -->
         @if (!esModoRegistro()) {

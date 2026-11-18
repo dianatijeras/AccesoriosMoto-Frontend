@@ -23,32 +23,32 @@
         <button
           type="button"
           class="cat-tab-btn"
-          disabled
-          title="El catálogo no admite filtrar por categoría"
+          [class.active]="categoriaActiva() === 'CASCOS'"
+          (click)="cambiarCategoria('CASCOS')"
         >
           CASCOS
         </button>
         <button
           type="button"
           class="cat-tab-btn"
-          disabled
-          title="El catálogo no admite filtrar por categoría"
+          [class.active]="categoriaActiva() === 'TEXTIL'"
+          (click)="cambiarCategoria('TEXTIL')"
         >
           TEXTIL (CHAQUETAS & GUANTES)
         </button>
         <button
           type="button"
           class="cat-tab-btn"
-          disabled
-          title="El catálogo no admite filtrar por categoría"
+          [class.active]="categoriaActiva() === 'ACCESORIOS'"
+          (click)="cambiarCategoria('ACCESORIOS')"
         >
           ACCESORIOS & INTERCOM
         </button>
         <button
           type="button"
           class="cat-tab-btn"
-          disabled
-          title="El catálogo no admite filtrar por categoría"
+          [class.active]="categoriaActiva() === 'REPUESTOS'"
+          (click)="cambiarCategoria('REPUESTOS')"
         >
           REPUESTOS & VISORES
         </button>
@@ -557,11 +557,11 @@
           </button>
         </div>
 
-        <form (ngSubmit)="guardarNuevoProducto()" class="modal-form">
+        <form [formGroup]="productoForm" (ngSubmit)="guardarNuevoProducto()" class="modal-form">
           <div class="form-row">
             <div class="form-field">
               <label class="field-label">TIPO DE PRODUCTO</label>
-              <select [(ngModel)]="nuevoProducto.tipo" name="tipo" (change)="onTipoProductoChange()" class="form-select">
+              <select formControlName="tipo" (change)="onTipoProductoChange()" class="form-select">
                 <option value="Casco">Casco</option>
                 <option value="Chaqueta">Chaqueta</option>
                 <option value="Guantes">Guantes</option>
@@ -575,32 +575,32 @@
 
             <div class="form-field">
               <label class="field-label">MARCA</label>
-              <input type="text" [(ngModel)]="nuevoProducto.marcaNombre" name="marcaNombre" class="form-input" required />
+              <input type="text" formControlName="marcaNombre" class="form-input" required />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-field">
               <label class="field-label">COLOR</label>
-              <input type="text" [(ngModel)]="nuevoProducto.color" name="color" class="form-input" required />
+              <input type="text" formControlName="color" class="form-input" required />
             </div>
 
             <div class="form-field">
               <label class="field-label">PRECIO (COP)</label>
-              <input type="number" [(ngModel)]="nuevoProducto.precioMonto" name="precioMonto" class="form-input" required min="1000" />
+              <input type="number" formControlName="precioMonto" class="form-input" required min="1000" />
             </div>
           </div>
 
           <!-- Campos para Casco -->
-          @if (nuevoProducto.tipo === 'Casco') {
+          @if (productoForm.controls.tipo.value === 'Casco') {
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MODELO</label>
-                <input type="text" [(ngModel)]="nuevoProducto.modelo" name="modelo" class="form-input" placeholder="Ej. K3 SV Racing" required />
+                <input type="text" formControlName="modelo" class="form-input" placeholder="Ej. K3 SV Racing" required />
               </div>
               <div class="form-field">
                 <label class="field-label">TALLA</label>
-                <select [(ngModel)]="nuevoProducto.talla" name="talla" class="form-input">
+                <select formControlName="talla" class="form-input">
                   @for (t of tallasDisponibles; track t) {
                     <option [value]="t">Talla {{ t }}</option>
                   }
@@ -610,7 +610,7 @@
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">NIVEL DE PROTECCIÓN</label>
-                <select [(ngModel)]="nuevoProducto.proteccion" name="proteccion" class="form-input">
+                <select formControlName="proteccion" class="form-input">
                   @for (np of nivelesProteccion; track np.valor) {
                     <option [value]="np.valor">{{ np.label }}</option>
                   }
@@ -618,17 +618,17 @@
               </div>
               <div class="form-field">
                 <label class="field-label">CERTIFICACIÓN</label>
-                <input type="text" [(ngModel)]="nuevoProducto.certificacionSeguridad" name="certificacionSeguridad" class="form-input" placeholder="ECE 22.06 / DOT" required />
+                <input type="text" formControlName="certificacionSeguridad" class="form-input" placeholder="ECE 22.06 / DOT" required />
               </div>
             </div>
           }
 
           <!-- Campos para Chaqueta o Guantes -->
-          @if (nuevoProducto.tipo === 'Chaqueta' || nuevoProducto.tipo === 'Guantes') {
+          @if (productoForm.controls.tipo.value === 'Chaqueta' || productoForm.controls.tipo.value === 'Guantes') {
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MATERIAL</label>
-                <select [(ngModel)]="nuevoProducto.material" name="material" class="form-input">
+                <select formControlName="material" class="form-input">
                   @for (m of materiales; track m.valor) {
                     <option [value]="m.valor">{{ m.label }}</option>
                   }
@@ -636,7 +636,7 @@
               </div>
               <div class="form-field">
                 <label class="field-label">TALLA</label>
-                <select [(ngModel)]="nuevoProducto.talla" name="talla" class="form-input">
+                <select formControlName="talla" class="form-input">
                   @for (t of tallasDisponibles; track t) {
                     <option [value]="t">Talla {{ t }}</option>
                   }
@@ -645,7 +645,7 @@
             </div>
             <div class="form-field">
               <label class="field-label">NIVEL DE PROTECCIÓN</label>
-              <select [(ngModel)]="nuevoProducto.proteccion" name="proteccion" class="form-input">
+              <select formControlName="proteccion" class="form-input">
                 @for (np of nivelesProteccion; track np.valor) {
                   <option [value]="np.valor">{{ np.label }}</option>
                 }
@@ -654,11 +654,11 @@
           }
 
           <!-- Campos para Impermeable -->
-          @if (nuevoProducto.tipo === 'Impermeable') {
+          @if (productoForm.controls.tipo.value === 'Impermeable') {
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MATERIAL</label>
-                <select [(ngModel)]="nuevoProducto.material" name="material" class="form-input">
+                <select formControlName="material" class="form-input">
                   @for (m of materiales; track m.valor) {
                     <option [value]="m.valor">{{ m.label }}</option>
                   }
@@ -666,7 +666,7 @@
               </div>
               <div class="form-field">
                 <label class="field-label">TALLA</label>
-                <select [(ngModel)]="nuevoProducto.talla" name="talla" class="form-input">
+                <select formControlName="talla" class="form-input">
                   @for (t of tallasDisponibles; track t) {
                     <option [value]="t">Talla {{ t }}</option>
                   }
@@ -676,11 +676,11 @@
           }
 
           <!-- Campos para Baúl -->
-          @if (nuevoProducto.tipo === 'Baul') {
+          @if (productoForm.controls.tipo.value === 'Baul') {
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MATERIAL</label>
-                <select [(ngModel)]="nuevoProducto.material" name="material" class="form-input">
+                <select formControlName="material" class="form-input">
                   @for (m of materiales; track m.valor) {
                     <option [value]="m.valor">{{ m.label }}</option>
                   }
@@ -688,36 +688,36 @@
               </div>
               <div class="form-field">
                 <label class="field-label">CAPACIDAD (LITROS)</label>
-                <input type="number" [(ngModel)]="nuevoProducto.capacidadLitros" name="capacidadLitros" class="form-input" min="1" />
+                <input type="number" formControlName="capacidadLitros" class="form-input" min="1" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">CARGA MÁXIMA (KG)</label>
-                <input type="number" [(ngModel)]="nuevoProducto.capacidadMaximaCarga" name="capacidadMaximaCarga" class="form-input" min="1" />
+                <input type="number" formControlName="capacidadMaximaCarga" class="form-input" min="1" />
               </div>
               <div class="form-field">
                 <label class="field-label">DIMENSIONES</label>
-                <input type="text" [(ngModel)]="nuevoProducto.dimensiones" name="dimensiones" class="form-input" placeholder="45x40x32 cm" />
+                <input type="text" formControlName="dimensiones" class="form-input" placeholder="45x40x32 cm" />
               </div>
             </div>
           }
 
           <!-- Campos para Intercomunicador -->
-          @if (nuevoProducto.tipo === 'Intercomunicador') {
+          @if (productoForm.controls.tipo.value === 'Intercomunicador') {
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">ALCANCE (METROS)</label>
-                <input type="number" [(ngModel)]="nuevoProducto.alcanceMetros" name="alcanceMetros" class="form-input" min="10" />
+                <input type="number" formControlName="alcanceMetros" class="form-input" min="10" />
               </div>
               <div class="form-field">
                 <label class="field-label">AUTONOMÍA (HORAS)</label>
-                <input type="number" [(ngModel)]="nuevoProducto.autonomiaHoras" name="autonomiaHoras" class="form-input" min="1" />
+                <input type="number" formControlName="autonomiaHoras" class="form-input" min="1" />
               </div>
             </div>
             <div class="form-field">
               <label class="field-label">TECNOLOGÍA BLUETOOTH</label>
-              <select [(ngModel)]="nuevoProducto.bluetooth" name="bluetooth" class="form-input">
+              <select formControlName="bluetooth" class="form-input">
                 <option [ngValue]="true">Sí (Bluetooth Integrado)</option>
                 <option [ngValue]="false">No (Solo conexión cable / análoga)</option>
               </select>
@@ -725,18 +725,18 @@
           }
 
           <!-- Campos para Soporte Celular -->
-          @if (nuevoProducto.tipo === 'SoporteCelular') {
+          @if (productoForm.controls.tipo.value === 'SoporteCelular') {
             <div class="form-field">
               <label class="field-label">TIPO DE SUJECIÓN</label>
-              <input type="text" [(ngModel)]="nuevoProducto.tipoSujecion" name="tipoSujecion" class="form-input" placeholder="Manubrio, Espejo retrovisor" />
+              <input type="text" formControlName="tipoSujecion" class="form-input" placeholder="Manubrio, Espejo retrovisor" />
             </div>
           }
 
           <!-- Campos para Visor -->
-          @if (nuevoProducto.tipo === 'Visor') {
+          @if (productoForm.controls.tipo.value === 'Visor') {
             <div class="form-field">
               <label class="field-label">TIPO DE VISOR</label>
-              <input type="text" [(ngModel)]="nuevoProducto.tipoVisor" name="tipoVisor" class="form-input" placeholder="Transparente, Humo oscuro, Iridium Azul" />
+              <input type="text" formControlName="tipoVisor" class="form-input" placeholder="Transparente, Humo oscuro, Iridium Azul" />
             </div>
           }
 
@@ -838,7 +838,7 @@
 
           <div class="modal-footer">
             <button type="button" (click)="cerrarModalCrear()" class="btn-cancel">Cancelar</button>
-            <button type="submit" [disabled]="guardandoProducto()" class="btn-submit-product">
+            <button type="submit" [disabled]="productoForm.invalid || guardandoProducto()" class="btn-submit-product">
               {{ guardandoProducto() ? 'Guardando en BD...' : 'Crear Producto en Backend' }}
             </button>
           </div>

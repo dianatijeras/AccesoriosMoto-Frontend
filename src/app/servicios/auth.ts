@@ -23,7 +23,6 @@ export class AuthService {
   public estaAutenticado = computed(() => !!this.sesionSignal()?.token);
   public esAdmin = computed(() => this.sesionSignal()?.rol === 'ADMINISTRADOR');
   public esComprador = computed(() => this.sesionSignal()?.rol === 'COMPRADOR');
-  public readonly avisoSesionVencida = signal<string | null>(null);
 
   constructor(private http: HttpClient) {}
 
@@ -90,7 +89,6 @@ export class AuthService {
   }
 
   private guardarSesion(sesion: UsuarioSesion): void {
-    this.avisoSesionVencida.set(null);
     try {
       localStorage.setItem(this.tokenKey, sesion.token);
       localStorage.setItem(this.userKey, JSON.stringify(sesion));

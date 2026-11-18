@@ -1,20 +1,23 @@
-﻿import { forkJoin } from 'rxjs';
-import { Component, OnInit, signal, inject, HostListener } from '@angular/core';
+﻿import { Subscription } from 'rxjs';
+import { Component, DestroyRef, OnInit, signal, inject, HostListener } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
+import { AvisosService } from '../../servicios/avisos';
 import { CatalogoService } from '../../servicios/catalogo';
 import { AuthService } from '../../servicios/auth';
 import { ComprasService } from '../../servicios/compras';
 import { WishlistService } from '../../servicios/wishlist';
 import { CarritoService } from '../../servicios/carrito';
 import { ImagenesProductoService } from '../../servicios/imagenes-producto';
-import { ProductoResponse, TipoCompatibilidad } from '../../modelos/catalogo';
+import { FiltroProducto, ProductoResponse, TipoCompatibilidad } from '../../modelos/catalogo';
 
 @Component({
   selector: 'app-catalogo',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule],
   templateUrl: './catalogo.html',
   styleUrl: './catalogo.css',
 })
@@ -27,9 +30,12 @@ export class Catalogo implements OnInit {
   private comprasService = inject(ComprasService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private avisos = inject(AvisosService);
+  private formBuilder = inject(FormBuilder).nonNullable;
 
-  // Todos los productos cargados del backend
-  todosLosProductos = signal<ProductoResponse[]>([]);
+  private destroyRef = inject(DestroyRef);
+  private solicitudProductos?: Subscription;
+  private filtrosAplicados: FiltroProducto & { texto?: string } = {};
 
   // Productos de la página activa que se muestran en la cuadrícula
   productos = signal<ProductoResponse[]>([]);
@@ -43,7 +49,7 @@ export class Catalogo implements OnInit {
   // Paginación
   pagina = signal<number>(0);
   tamano = signal<number>(9);
-  totalPaginas = signal<number>(1);
+  totalPaginas = signal<number>(0);
   totalElementos = signal<number>(0);
   readonly tamanosDisponibles = [9, 18, 27];
 
@@ -111,219 +117,90 @@ export class Catalogo implements OnInit {
   }
 
   ngOnInit(): void {
+    this.actualizarCamposProducto();
     if (this.route.snapshot.data['abrirFormularioProducto'] && this.authService.esAdmin()) {
       this.abrirModalCrear();
     }
 
-    this.route.queryParams.subscribe((params) => {
-      if (params['categoria']) {
-        const cat = params['categoria'].toUpperCase();
-        this.categoriaActiva.set(cat);
-      } else if (params['tipo']) {
-        const t = params['tipo'].toUpperCase();
-        this.categoriaActiva.set(t.includes('CASCO') ? 'CASCOS' : t);
-      } else if (params['outlet']) {
-        this.categoriaActiva.set('OUTLET');
-      } else {
-        this.categoriaActiva.set('TODOS');
-      }
-
-      if (params['q']) {
-        this.busquedaTexto = params['q'];
-      }
-      if (params['marca']) {
-        this.filtroMarca = params['marca'];
-      }
-      if (params['color']) {
-        this.filtroColor = params['color'];
-      }
-
-      this.cargarProductos(0);
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      this.limpiarFiltrosInternos();
+      const categoria = params.get('categoria')?.toUpperCase();
+      const tipo = params.get('tipo')?.toUpperCase();
+      this.categoriaActiva.set(
+        categoria || (tipo?.includes('CASCO') ? 'CASCOS' : tipo) || (params.has('outlet') ? 'OUTLET' : 'TODOS')
+      );
+      this.busquedaTexto = params.get('q') ?? '';
+      this.filtroMarca = params.get('marca') ?? '';
+      this.filtroColor = params.get('color') ?? '';
+      this.aplicarFiltros();
     });
   }
 
   cambiarCategoria(categoria: string): void {
-    this.categoriaActiva.set(categoria);
     this.limpiarFiltrosInternos();
+    this.categoriaActiva.set(categoria);
 
-    this.router.navigate([], {
+    const destino = this.router.createUrlTree([], {
       relativeTo: this.route,
       queryParams: categoria === 'TODOS' ? {} : { categoria: categoria.toLowerCase() },
     });
-
-    this.aplicarFiltrosYPaginar(0);
-  }
-
-  // Clave de almacenamiento local para productos despublicados (asegura persistencia visual para el admin)
-  private readonly STORAGE_DESPUBLICADOS = 'accesorios_admin_despublicados';
-
-  private obtenerDespublicadosLocales(): Record<string, ProductoResponse> {
-    try {
-      const data = localStorage.getItem(this.STORAGE_DESPUBLICADOS);
-      return data ? JSON.parse(data) : {};
-    } catch {
-      return {};
+    if (this.router.serializeUrl(destino) === this.router.url) {
+      this.aplicarFiltros();
+    } else {
+      void this.router.navigateByUrl(destino);
     }
-  }
-
-  private guardarDespublicadoLocal(producto: ProductoResponse): void {
-    try {
-      const mapa = this.obtenerDespublicadosLocales();
-      mapa[producto.id] = { ...producto, estadoPublicacion: 'NO_PUBLICADO' };
-      localStorage.setItem(this.STORAGE_DESPUBLICADOS, JSON.stringify(mapa));
-    } catch {}
-  }
-
-  private removerDespublicadoLocal(productoId: string): void {
-    try {
-      const mapa = this.obtenerDespublicadosLocales();
-      delete mapa[productoId];
-      localStorage.setItem(this.STORAGE_DESPUBLICADOS, JSON.stringify(mapa));
-    } catch {}
   }
 
   cargarProductos(numPagina: number = 0): void {
+    this.solicitudProductos?.unsubscribe();
     this.cargando.set(true);
     this.error.set(null);
 
-    // Consultamos el catálogo en lotes de 50 para respetar el límite del Backend y consolidar los 160+ productos
-    forkJoin([
-      this.catalogoService.listar({ pagina: 0, tamano: 50 }),
-      this.catalogoService.listar({ pagina: 1, tamano: 50 }),
-      this.catalogoService.listar({ pagina: 2, tamano: 50 }),
-      this.catalogoService.listar({ pagina: 3, tamano: 50 }),
-    ]).subscribe({
-      next: (respuestas) => {
-        const seen = new Set<string>();
-        let items: ProductoResponse[] = [];
-        for (const resp of respuestas) {
-          if (resp && resp.content) {
-            for (const p of resp.content) {
-              if (!seen.has(p.id)) {
-                seen.add(p.id);
-                items.push(p);
-              }
-            }
-          }
+    const { texto, precioMinimo, precioMaximo, ...filtros } = this.filtrosAplicados;
+    const paginacion = { pagina: numPagina, tamano: this.tamano() };
+    const precios = { precioMinimo, precioMaximo, moneda: 'COP' };
+    const solicitud = texto
+      ? this.catalogoService.buscarPorTexto({ texto, ...precios, ...paginacion })
+      : this.catalogoService.listar({ ...filtros, ...precios, ...paginacion });
+
+    this.solicitudProductos = solicitud.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: ({ content, totalElements, totalPages, number }) => {
+        if (totalPages > 0 && number >= totalPages) {
+          this.cargarProductos(totalPages - 1);
+          return;
         }
 
-          // 1. Filtrar visibilidad según el rol del usuario:
-          if (this.authService.esAdmin()) {
-            const despubMap = this.obtenerDespublicadosLocales();
-            items = items.map((p) => {
-              if (despubMap[p.id]) {
-                return { ...p, estadoPublicacion: 'NO_PUBLICADO' };
-              }
-              return p;
-            });
-
-            // Si algún producto despublicado fue omitido, conservarlo visible para el admin
-            Object.values(despubMap).forEach((pDespub) => {
-              if (!items.some((p) => p.id === pDespub.id)) {
-                items.unshift(pDespub);
-              }
-            });
-          } else {
-            // Para CLIENTES / VISITANTES: los productos despublicados son estrictamente invisibles
-            items = items.filter((p) => p.estadoPublicacion === 'PUBLICADO');
-          }
-
-          this.todosLosProductos.set(items);
-          this.actualizarMarcasYColores(items);
-          this.aplicarFiltrosYPaginar(numPagina);
-          this.cargando.set(false);
-        },
-        error: (err) => {
-          this.error.set('No se pudo conectar con el catálogo: ' + (err.error?.mensaje || err.message));
-          this.cargando.set(false);
-        },
-      });
+        this.productos.set(content);
+        this.totalElementos.set(totalElements);
+        this.totalPaginas.set(totalPages);
+        this.pagina.set(totalPages ? number : 0);
+        this.actualizarMarcasYColores(content);
+        this.cargando.set(false);
+      },
+      error: (err) => {
+        this.error.set('No se pudo conectar con el catálogo: ' + (err.error?.mensaje || err.message));
+        this.cargando.set(false);
+      },
+    });
   }
 
   private actualizarMarcasYColores(items: ProductoResponse[]): void {
-    const marcasSet = new Set<string>(this.marcasDisponibles);
-    const coloresSet = new Set<string>(this.coloresDisponibles);
-
-    items.forEach((p) => {
-      const marcaVal = typeof p.marca === 'string' ? p.marca : ((p.marca as any)?.nombre || '');
-      if (marcaVal && marcaVal.trim()) {
-        marcasSet.add(marcaVal.trim());
-      }
-      if (p.color && typeof p.color === 'string' && p.color.trim()) {
-        const c = p.color.split('/')[0].trim();
-        coloresSet.add(c);
-      }
-    });
-
-    this.marcasDisponibles = Array.from(marcasSet).sort();
-    this.coloresDisponibles = Array.from(coloresSet).sort();
-  }
-
-  aplicarFiltrosYPaginar(numPagina: number = 0): void {
-    let items = [...this.todosLosProductos()];
-
-    // 1. Rol cliente
-    if (!this.authService.esAdmin()) {
-      items = items.filter((p) => p.estadoPublicacion === 'PUBLICADO');
+    const marcas = new Set(this.marcasDisponibles);
+    const colores = new Set(this.coloresDisponibles);
+    for (const producto of items) {
+      const marca = producto.marca?.trim();
+      const color = producto.color?.trim();
+      if (marca) marcas.add(marca);
+      if (color) colores.add(color);
     }
 
-    // 2. Filtrar por categoría activa
-    items = this.filtrarPorCategoria(items);
-
-    // 3. Filtro por marca
-    if (this.filtroMarca) {
-      items = items.filter((p) => {
-        const marcaVal = typeof p.marca === 'string' ? p.marca : ((p.marca as any)?.nombre || '');
-        return marcaVal.toLowerCase() === this.filtroMarca.toLowerCase();
-      });
-    }
-
-    // 4. Filtro por color
-    if (this.filtroColor) {
-      items = items.filter((p) => p.color && p.color.toLowerCase().includes(this.filtroColor.toLowerCase()));
-    }
-
-    // 5. Filtro por rango de precio
-    if (this.precioMin != null) {
-      items = items.filter((p) => p.precioMonto >= this.precioMin!);
-    }
-    if (this.precioMax != null) {
-      items = items.filter((p) => p.precioMonto <= this.precioMax!);
-    }
-
-    // 6. Búsqueda por texto (marca, tipo, color o ID)
-    if (this.busquedaTexto.trim()) {
-      const query = this.busquedaTexto.trim().toLowerCase();
-      items = items.filter((p) => {
-        const marcaVal = typeof p.marca === 'string' ? p.marca : ((p.marca as any)?.nombre || '');
-        return (
-          marcaVal.toLowerCase().includes(query) ||
-          (p.tipo && p.tipo.toLowerCase().includes(query)) ||
-          (p.color && p.color.toLowerCase().includes(query)) ||
-          (p.id && p.id.toLowerCase().includes(query))
-        );
-      });
-    }
-
-    // 7. Cálculo de paginación
-    const total = items.length;
-    const tam = this.tamano();
-    const paginas = Math.max(1, Math.ceil(total / tam));
-    const pagValida = Math.min(Math.max(0, numPagina), paginas - 1);
-
-    this.totalElementos.set(total);
-    this.totalPaginas.set(paginas);
-    this.pagina.set(pagValida);
-
-    // 8. Rebanada para la página actual
-    const inicio = pagValida * tam;
-    const fin = inicio + tam;
-    this.productos.set(items.slice(inicio, fin));
+    this.marcasDisponibles = [...marcas].sort();
+    this.coloresDisponibles = [...colores].sort();
   }
 
   cambiarPagina(num: number): void {
     if (num < 0 || num >= this.totalPaginas() || num === this.pagina()) return;
-    this.aplicarFiltrosYPaginar(num);
+    this.cargarProductos(num);
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 380, behavior: 'smooth' });
     }
@@ -331,7 +208,7 @@ export class Catalogo implements OnInit {
 
   cambiarTamano(nuevoTamano: number): void {
     this.tamano.set(nuevoTamano);
-    this.aplicarFiltrosYPaginar(0);
+    this.cargarProductos(0);
   }
 
   paginasVisibles(): number[] {
@@ -352,57 +229,35 @@ export class Catalogo implements OnInit {
     return res;
   }
 
-  private filtrarPorCategoria(items: ProductoResponse[]): ProductoResponse[] {
-    const cat = this.categoriaActiva();
-    if (cat === 'CASCOS') {
-      return items.filter((p) => p.tipo?.toLowerCase().includes('casco'));
-    }
-    if (cat === 'TEXTIL') {
-      return items.filter((p) => {
-        const t = p.tipo?.toLowerCase() || '';
-        return t.includes('chaqueta') || t.includes('guante') || t.includes('impermeable');
-      });
-    }
-    if (cat === 'ACCESORIOS') {
-      return items.filter((p) => {
-        const t = p.tipo?.toLowerCase() || '';
-        return t.includes('baul') || t.includes('soporte') || t.includes('intercom');
-      });
-    }
-    if (cat === 'REPUESTOS') {
-      return items.filter((p) => {
-        const t = p.tipo?.toLowerCase() || '';
-        return t.includes('visor');
-      });
-    }
-    if (cat === 'OUTLET') {
-      return items.filter((p) => p.precioMonto <= 300000);
-    }
-    return items;
-  }
-
   seleccionarMarca(marca: string): void {
     this.filtroMarca = this.filtroMarca === marca ? '' : marca;
-    this.dropdownMarcasAbierto.set(false);
-    this.aplicarFiltrosYPaginar(0);
+    this.aplicarFiltros();
   }
 
   seleccionarColor(color: string): void {
     this.filtroColor = this.filtroColor === color ? '' : color;
-    this.dropdownColoresAbierto.set(false);
-    this.aplicarFiltrosYPaginar(0);
+    this.aplicarFiltros();
   }
 
   aplicarFiltros(): void {
     this.cerrarDropdowns();
-    this.aplicarFiltrosYPaginar(0);
+    const modelo = this.compatibilidadModelo.trim();
+    const compatibilidadCompleta = this.compatibilidadTipo && modelo;
+    const maximo = this.precioMax ?? undefined;
+    this.filtrosAplicados = {
+      texto: this.busquedaTexto.trim(),
+      marca: this.filtroMarca || undefined,
+      color: this.filtroColor || undefined,
+      precioMinimo: this.precioMin ?? undefined,
+      precioMaximo: this.categoriaActiva() === 'OUTLET' ? Math.min(maximo ?? 300000, 300000) : maximo,
+      tipoCompatibilidad: compatibilidadCompleta ? this.compatibilidadTipo || undefined : undefined,
+      modeloCompatibilidad: compatibilidadCompleta ? modelo : undefined,
+    };
+    this.cargarProductos(0);
   }
 
   limpiarFiltros(): void {
-    this.limpiarFiltrosInternos();
-    this.categoriaActiva.set('TODOS');
-    this.router.navigate([], { relativeTo: this.route, queryParams: {} });
-    this.aplicarFiltrosYPaginar(0);
+    this.cambiarCategoria('TODOS');
   }
 
   private limpiarFiltrosInternos(): void {
@@ -424,12 +279,8 @@ export class Catalogo implements OnInit {
     if (producto.estadoPublicacion === 'PUBLICADO') {
       this.catalogoService.despublicar(producto.id).subscribe({
         next: () => {
-          this.guardarDespublicadoLocal(producto);
           this.mensaje.set(`Producto "${producto.marca} ${producto.tipo}" despublicado (oculto para clientes).`);
-          this.todosLosProductos.update((lista) =>
-            lista.map((p) => (p.id === producto.id ? { ...p, estadoPublicacion: 'NO_PUBLICADO' } : p))
-          );
-          this.aplicarFiltrosYPaginar(this.pagina());
+          this.cargarProductos(this.pagina());
           setTimeout(() => this.mensaje.set(null), 4000);
         },
         error: (err) => this.error.set('Error al despublicar: ' + (err.error?.mensaje || err.message)),
@@ -437,12 +288,8 @@ export class Catalogo implements OnInit {
     } else {
       this.catalogoService.publicar(producto.id).subscribe({
         next: () => {
-          this.removerDespublicadoLocal(producto.id);
           this.mensaje.set(`Producto "${producto.marca} ${producto.tipo}" vuelto a poner disponible en la tienda.`);
-          this.todosLosProductos.update((lista) =>
-            lista.map((p) => (p.id === producto.id ? { ...p, estadoPublicacion: 'PUBLICADO' } : p))
-          );
-          this.aplicarFiltrosYPaginar(this.pagina());
+          this.cargarProductos(this.pagina());
           setTimeout(() => this.mensaje.set(null), 4000);
         },
         error: (err) => this.error.set('Error al publicar: ' + (err.error?.mensaje || err.message)),
@@ -455,12 +302,9 @@ export class Catalogo implements OnInit {
     this.cargando.set(true);
     this.catalogoService.eliminar(producto.id).subscribe({
       next: () => {
-        this.removerDespublicadoLocal(producto.id);
         this.wishlistService.eliminar(producto.id);
         this.mensaje.set(`Producto "${producto.marca} ${producto.tipo}" eliminado del catálogo.`);
-        this.todosLosProductos.update((lista) => lista.filter((p) => p.id !== producto.id));
-        this.aplicarFiltrosYPaginar(this.pagina());
-        this.cargando.set(false);
+        this.cargarProductos(this.pagina());
         setTimeout(() => this.mensaje.set(null), 4000);
       },
       error: (err) => {
@@ -578,26 +422,39 @@ export class Catalogo implements OnInit {
     { valor: 'ACERO', label: 'Acero Inoxidable' },
   ];
 
-  // Formulario nuevo producto con soporte completo de imágenes y tipos del backend
-  nuevoProducto = {
-    tipo: 'Casco',
-    marcaNombre: 'AGV',
-    color: 'Negro',
-    precioMonto: 650000,
-    modelo: 'K3 SV Racing',
-    talla: 'M',
-    material: 'POLICARBONATO',
-    proteccion: 'NIVEL_3',
-    certificacionSeguridad: 'ECE 22.06',
-    capacidadLitros: 45,
-    dimensiones: '40x35x30 cm',
-    capacidadMaximaCarga: 10,
-    alcanceMetros: 1200,
-    autonomiaHoras: 13,
-    bluetooth: true,
-    tipoSujecion: 'Manubrio',
-    tipoVisor: 'Transparente Antirrayas Pinlock Ready',
+  private readonly textoObligatorio = [Validators.required, Validators.pattern(/\S/)];
+  readonly productoForm = this.formBuilder.group({
+    tipo: ['Casco', Validators.required],
+    marcaNombre: ['AGV', this.textoObligatorio],
+    color: ['Negro', this.textoObligatorio],
+    precioMonto: [650000, [Validators.required, Validators.min(1000)]],
+    modelo: ['K3 SV Racing', this.textoObligatorio],
+    talla: ['M', Validators.required],
+    material: ['POLICARBONATO', Validators.required],
+    proteccion: ['NIVEL_3', Validators.required],
+    certificacionSeguridad: ['ECE 22.06', this.textoObligatorio],
+    capacidadLitros: [45, [Validators.required, Validators.min(1)]],
+    dimensiones: ['40x35x30 cm', this.textoObligatorio],
+    capacidadMaximaCarga: [10, [Validators.required, Validators.min(1)]],
+    alcanceMetros: [1200, [Validators.required, Validators.min(10)]],
+    autonomiaHoras: [13, [Validators.required, Validators.min(1)]],
+    bluetooth: [true, Validators.required],
+    tipoSujecion: ['Manubrio', this.textoObligatorio],
+    tipoVisor: ['Transparente Antirrayas Pinlock Ready', this.textoObligatorio],
+  });
 
+  private readonly camposPorTipo: Record<string, (keyof typeof this.productoForm.controls)[]> = {
+    Casco: ['modelo', 'talla', 'proteccion', 'certificacionSeguridad'],
+    Chaqueta: ['material', 'talla', 'proteccion'],
+    Guantes: ['material', 'talla', 'proteccion'],
+    Impermeable: ['material', 'talla'],
+    Baul: ['material', 'capacidadLitros', 'dimensiones', 'capacidadMaximaCarga'],
+    Intercomunicador: ['alcanceMetros', 'autonomiaHoras', 'bluetooth'],
+    SoporteCelular: ['tipoSujecion'],
+    Visor: ['tipoVisor'],
+  };
+
+  nuevoProducto = {
     // Configuración de imagen (solo Galería y Descargas)
     modoImagen: 'preset' as 'preset' | 'descargados',
     imagenUrl: '/productos/casco-scorpion-exo.jpg',
@@ -613,44 +470,45 @@ export class Catalogo implements OnInit {
   }
 
   onTipoProductoChange(): void {
-    const tipo = this.nuevoProducto.tipo;
+    const tipo = this.productoForm.controls.tipo.value;
     if (tipo === 'Casco') {
-      this.nuevoProducto.talla = 'M';
-      this.nuevoProducto.proteccion = 'NIVEL_3';
-      this.nuevoProducto.material = 'POLICARBONATO';
-      this.nuevoProducto.certificacionSeguridad = 'ECE 22.06';
+      this.productoForm.patchValue({ talla: 'M', proteccion: 'NIVEL_3', material: 'POLICARBONATO', certificacionSeguridad: 'ECE 22.06' });
       this.seleccionarPreset('/productos/casco-agv-k3-negro.jpg');
     } else if (tipo === 'Chaqueta') {
-      this.nuevoProducto.talla = 'L';
-      this.nuevoProducto.proteccion = 'NIVEL_2';
-      this.nuevoProducto.material = 'CUERO';
+      this.productoForm.patchValue({ talla: 'L', proteccion: 'NIVEL_2', material: 'CUERO' });
       this.seleccionarPreset('/productos/chaqueta-alpinestars-cuero.jpg');
     } else if (tipo === 'Guantes') {
-      this.nuevoProducto.talla = 'M';
-      this.nuevoProducto.proteccion = 'NIVEL_2';
-      this.nuevoProducto.material = 'CUERO';
+      this.productoForm.patchValue({ talla: 'M', proteccion: 'NIVEL_2', material: 'CUERO' });
       this.seleccionarPreset('/productos/guantes-dainese-negro.jpg');
     } else if (tipo === 'Impermeable') {
-      this.nuevoProducto.talla = 'L';
-      this.nuevoProducto.material = 'PVC';
+      this.productoForm.patchValue({ talla: 'L', material: 'PVC' });
       this.seleccionarPreset('/productos/impermeable-rainwear-azul.jpg');
     } else if (tipo === 'Baul') {
-      this.nuevoProducto.material = 'ALUMINIO';
-      this.nuevoProducto.capacidadLitros = 45;
-      this.nuevoProducto.capacidadMaximaCarga = 10;
-      this.nuevoProducto.dimensiones = '45x40x32 cm';
+      this.productoForm.patchValue({ material: 'ALUMINIO', capacidadLitros: 45, capacidadMaximaCarga: 10, dimensiones: '45x40x32 cm' });
       this.seleccionarPreset('/productos/baul-givi-negro.jpg');
     } else if (tipo === 'Intercomunicador') {
-      this.nuevoProducto.alcanceMetros = 1200;
-      this.nuevoProducto.autonomiaHoras = 13;
-      this.nuevoProducto.bluetooth = true;
+      this.productoForm.patchValue({ alcanceMetros: 1200, autonomiaHoras: 13, bluetooth: true });
       this.seleccionarPreset('/productos/intercomunicador-cardo-gris.jpg');
     } else if (tipo === 'SoporteCelular') {
-      this.nuevoProducto.tipoSujecion = 'Manubrio';
+      this.productoForm.patchValue({ tipoSujecion: 'Manubrio' });
       this.seleccionarPreset('/productos/soporte-quadlock-negro.jpg');
     } else if (tipo === 'Visor') {
-      this.nuevoProducto.tipoVisor = 'Transparente Antirrayas Pinlock Ready';
+      this.productoForm.patchValue({ tipoVisor: 'Transparente Antirrayas Pinlock Ready' });
       this.seleccionarPreset('/productos/visor-agv-transparente.jpg');
+    }
+    this.actualizarCamposProducto();
+  }
+
+  private actualizarCamposProducto(): void {
+    const { controls } = this.productoForm;
+    const camposActivos = this.camposPorTipo[controls.tipo.value] ?? [];
+    for (const campo of Object.keys(controls) as (keyof typeof controls)[]) {
+      if (campo === 'tipo' || campo === 'marcaNombre' || campo === 'color' || campo === 'precioMonto') continue;
+      if (camposActivos.includes(campo)) {
+        controls[campo].enable({ emitEvent: false });
+      } else {
+        controls[campo].disable({ emitEvent: false });
+      }
     }
   }
 
@@ -697,7 +555,7 @@ export class Catalogo implements OnInit {
         this.nuevoProducto.imagenUrl = '/productos/visor-agv-transparente.jpg';
         this.nuevoProducto.previewImagen = '/productos/visor-agv-transparente.jpg';
       } else {
-        const rutaEstatica = this.obtenerPresetPorTipo(this.nuevoProducto.tipo);
+        const rutaEstatica = this.obtenerPresetPorTipo(this.productoForm.controls.tipo.value);
         this.nuevoProducto.imagenUrl = rutaEstatica;
         this.nuevoProducto.previewImagen = URL.createObjectURL(file);
       }
@@ -718,7 +576,14 @@ export class Catalogo implements OnInit {
   }
 
   guardarNuevoProducto(): void {
-    const p = this.nuevoProducto;
+    if (this.guardandoProducto() || !this.authService.esAdmin()) return;
+    if (this.productoForm.invalid) {
+      this.productoForm.markAllAsTouched();
+      this.avisos.error('Revisa los datos ingresados.');
+      return;
+    }
+
+    const p = { ...this.productoForm.getRawValue(), ...this.nuevoProducto };
     const marcaId = 'marca-' + p.marcaNombre.trim().toLowerCase().replace(/[^a-z0-9]/g, '-');
     const precioMoneda = 'COP';
     const imagenFinal = p.imagenUrl || p.previewImagen || this.obtenerPresetPorTipo(p.tipo);
@@ -728,8 +593,6 @@ export class Catalogo implements OnInit {
       imagenFinal.startsWith('data:') || imagenFinal.length > 500
         ? this.obtenerPresetPorTipo(p.tipo)
         : imagenFinal;
-
-    this.guardandoProducto.set(true);
 
     let obs;
     if (p.tipo === 'Casco') {
@@ -815,7 +678,7 @@ export class Catalogo implements OnInit {
         tipoSujecion: p.tipoSujecion.trim() || 'Manubrio',
         imagenUrl: imagenParaBackend,
       });
-    } else {
+    } else if (p.tipo === 'Visor') {
       obs = this.catalogoService.crearVisor({
         marcaId,
         marcaNombre: p.marcaNombre.trim(),
@@ -827,6 +690,9 @@ export class Catalogo implements OnInit {
         imagenUrl: imagenParaBackend,
       });
     }
+
+    if (!obs) return;
+    this.guardandoProducto.set(true);
 
     obs.subscribe({
       next: (creado) => {
@@ -841,23 +707,26 @@ export class Catalogo implements OnInit {
           next: () => {
             this.guardandoProducto.set(false);
             this.cerrarModalCrear();
-            this.mensaje.set(`¡Producto "${p.marcaNombre} ${p.tipo}" creado y disponible en catálogo!`);
+            this.avisos.exito('Producto creado correctamente.');
             this.cargarProductos(0);
-            setTimeout(() => this.mensaje.set(null), 5000);
           },
           error: () => {
             this.guardandoProducto.set(false);
             this.cerrarModalCrear();
-            this.mensaje.set(`¡Producto "${p.marcaNombre} ${p.tipo}" creado exitosamente!`);
+            this.avisos.info('Producto creado. No se pudo publicar automáticamente.');
             this.cargarProductos(0);
-            setTimeout(() => this.mensaje.set(null), 5000);
           },
         });
       },
-      error: (err) => {
+      error: (err: HttpErrorResponse) => {
         this.guardandoProducto.set(false);
-        const detalle = err.error?.mensaje || err.error?.message || err.message || 'Error de validación';
-        this.error.set('Error al crear producto: ' + detalle);
+        const mensajes: Record<number, string> = {
+          400: 'Revisa los datos ingresados.',
+          401: 'Tu sesión no es válida. Inicia sesión nuevamente.',
+          403: 'No tienes permisos para realizar esta operación.',
+          404: 'No se encontró el recurso solicitado.',
+        };
+        this.avisos.error(mensajes[err.status] ?? 'No se pudo crear el producto. Inténtalo nuevamente.');
       },
     });
   }

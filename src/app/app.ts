@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, ViewContainerRef } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -8,6 +8,7 @@ import { CarritoService } from './servicios/carrito';
 import { ComprasService } from './servicios/compras';
 import { ImagenesProductoService } from './servicios/imagenes-producto';
 import { ProductoResponse } from './modelos/catalogo';
+import { AvisoComponent } from './componentes/avisos/avisos';
 
 @Component({
   selector: 'app-root',
@@ -35,6 +36,10 @@ export class App {
   procesandoPedido = signal<boolean>(false);
   mensajePedido = signal<string | null>(null);
   errorPedido = signal<string | null>(null);
+
+  constructor() {
+    inject(ViewContainerRef).createComponent(AvisoComponent);
+  }
 
   abrirMenu(menu: string): void {
     this.menuAbierto.set(menu);
