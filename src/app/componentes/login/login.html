@@ -91,21 +91,30 @@
         @if (error()) {
           <div class="biker-alert alert-error">{{ error() }}</div>
         }
+        @if (authService.avisoSesionVencida(); as aviso) {
+          <div class="biker-alert alert-error" role="alert">{{ aviso }}</div>
+        }
 
         <!-- FORMULARIO DE LOGIN -->
         @if (!esModoRegistro()) {
-          <form (ngSubmit)="iniciarSesion()" class="biker-form">
+          <form [formGroup]="loginForm" (ngSubmit)="iniciarSesion()" class="biker-form">
             <div class="form-field">
               <label for="loginEmail">CORREO ELECTRÓNICO</label>
               <input
                 id="loginEmail"
                 type="email"
-                [(ngModel)]="loginCorreo"
-                name="correo"
+                formControlName="correo"
                 placeholder="ejemplo@correo.com"
                 required
                 class="biker-input"
               />
+              @if (loginForm.controls.correo.touched) {
+                @if (loginForm.controls.correo.hasError('required')) {
+                  <span class="alert-error">El correo es obligatorio.</span>
+                } @else if (loginForm.controls.correo.hasError('email')) {
+                  <span class="alert-error">Ingresa un correo electrónico válido.</span>
+                }
+              }
             </div>
 
             <div class="form-field">
@@ -116,28 +125,29 @@
               <input
                 id="loginPass"
                 type="password"
-                [(ngModel)]="loginClave"
-                name="clave"
+                formControlName="contrasena"
                 placeholder="••••••••"
                 required
                 class="biker-input"
               />
+              @if (loginForm.controls.contrasena.touched && loginForm.controls.contrasena.hasError('required')) {
+                <span class="alert-error">La contraseña es obligatoria.</span>
+              }
             </div>
 
-            <button type="submit" class="btn-submit-biker" [disabled]="cargando()">
+            <button type="submit" class="btn-submit-biker" [disabled]="loginForm.invalid || cargando()">
               {{ cargando() ? 'INGRESANDO AL SISTEMA...' : 'INICIAR SESIÓN' }}
             </button>
           </form>
         } @else {
           <!-- FORMULARIO DE REGISTRO COMPRADOR -->
-          <form (ngSubmit)="registrar()" class="biker-form">
+          <form [formGroup]="registroForm" (ngSubmit)="registrar()" class="biker-form">
             <div class="form-field">
               <label for="regName">NOMBRE COMPLETO</label>
               <input
                 id="regName"
                 type="text"
-                [(ngModel)]="registroNombre"
-                name="nombre"
+                formControlName="nombre"
                 placeholder="Juan Pérez"
                 required
                 class="biker-input"
@@ -149,8 +159,7 @@
               <input
                 id="regMail"
                 type="email"
-                [(ngModel)]="registroCorreo"
-                name="correo"
+                formControlName="correo"
                 placeholder="juan@correo.com"
                 required
                 class="biker-input"
@@ -162,8 +171,7 @@
               <input
                 id="regPass"
                 type="password"
-                [(ngModel)]="registroClave"
-                name="clave"
+                formControlName="contrasena"
                 placeholder="••••••••"
                 minlength="8"
                 required

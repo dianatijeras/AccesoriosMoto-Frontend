@@ -1,33 +1,43 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, DestroyRef, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../servicios/auth';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
 export class Login {
   public authService = inject(AuthService);
   private router = inject(Router);
+  private formBuilder = inject(FormBuilder).nonNullable;
 
   esModoRegistro = signal<boolean>(false);
   cargando = signal<boolean>(false);
   error = signal<string | null>(null);
   mensaje = signal<string | null>(null);
 
-  // Campos de Login
-  loginCorreo = '';
-  loginClave = '';
+  readonly loginForm: FormGroup<{
+    correo: FormControl<string>;
+    contrasena: FormControl<string>;
+  }> = this.formBuilder.group({
+    correo: ['', [Validators.required, Validators.email]],
+    contrasena: ['', Validators.required],
+  });
 
-  // Campos de Registro
-  registroNombre = '';
-  registroCorreo = '';
-  registroClave = '';
+  readonly registroForm = this.formBuilder.group({
+    nombre: '',
+    correo: '',
+    contrasena: '',
+  });
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.authService.avisoSesionVencida.set(null));
+  }
 
   cambiarModo(registro: boolean): void {
     this.esModoRegistro.set(registro);
@@ -36,21 +46,21 @@ export class Login {
   }
 
   iniciarSesion(): void {
-    if (!this.loginCorreo || !this.loginClave) {
-      this.error.set('Por favor completa todos los campos.');
+    if (this.cargando()) return;
+
+    if (this.loginForm.invalid) {
+      this.loginForm.markAllAsTouched();
       return;
     }
 
     this.cargando.set(true);
     this.error.set(null);
+    this.authService.avisoSesionVencida.set(null);
 
     this.authService
-      .login({
-        correo: this.loginCorreo,
-        contrasena: this.loginClave,
-      })
+      .login(this.loginForm.getRawValue())
       .subscribe({
-        next: (resp) => {
+        next: () => {
           this.cargando.set(false);
           this.mensaje.set('¡Inicio de sesión exitoso!');
           setTimeout(() => {
@@ -60,21 +70,25 @@ export class Login {
         error: (err) => {
           this.cargando.set(false);
           this.error.set(
-            err.error?.error ||
-              err.error?.message ||
-              'Credenciales inválidas o error de conexión con el backend'
+            err.status === 401
+              ? 'Correo o contraseña incorrectos.'
+              : err.error?.error ||
+                  err.error?.message ||
+                  'No se pudo iniciar sesión. Verifica tu conexión e inténtalo de nuevo.'
           );
         },
       });
   }
 
   registrar(): void {
-    if (!this.registroNombre || !this.registroCorreo || !this.registroClave) {
+    const { nombre, correo, contrasena } = this.registroForm.getRawValue();
+
+    if (!nombre || !correo || !contrasena) {
       this.error.set('Por favor completa todos los campos.');
       return;
     }
 
-    if (this.registroClave.length < 8) {
+    if (contrasena.length < 8) {
       this.error.set('La contraseña debe tener mínimo 8 caracteres.');
       return;
     }
@@ -83,23 +97,16 @@ export class Login {
     this.error.set(null);
 
     this.authService
-      .registro({
-        nombre: this.registroNombre,
-        correo: this.registroCorreo,
-        contrasena: this.registroClave,
-      })
+      .registro({ nombre, correo, contrasena })
       .subscribe({
         next: (usuario) => {
-          const nombreMostrado = usuario?.nombre || this.registroNombre || 'comprador';
+          const nombreMostrado = usuario?.nombre || nombre || 'comprador';
           this.mensaje.set(
             `¡Usuario "${nombreMostrado}" registrado con éxito! Iniciando sesión automáticamente...`
           );
           // Inicio de sesión automático y persistencia inmediata en localStorage
           this.authService
-            .login({
-              correo: this.registroCorreo,
-              contrasena: this.registroClave,
-            })
+            .login({ correo, contrasena })
             .subscribe({
               next: () => {
                 this.cargando.set(false);
@@ -109,8 +116,7 @@ export class Login {
               },
               error: () => {
                 this.cargando.set(false);
-                this.loginCorreo = this.registroCorreo;
-                this.loginClave = this.registroClave;
+                this.loginForm.setValue({ correo, contrasena });
                 this.esModoRegistro.set(false);
               },
             });
