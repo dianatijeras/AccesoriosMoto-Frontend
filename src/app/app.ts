@@ -27,7 +27,6 @@ export class App {
 
   // Control del Mega Menú
   menuAbierto = signal<string | null>(null);
-  menuMovilAbierto = signal(false);
 
   // Buscador integrado en el header
   busquedaHeader = '';
@@ -48,16 +47,6 @@ export class App {
 
   cerrarMenu(): void {
     this.menuAbierto.set(null);
-  }
-
-  alternarMenuMovil(): void {
-    this.cerrarMenu();
-    this.menuMovilAbierto.update((abierto) => !abierto);
-  }
-
-  cerrarMenuMovil(): void {
-    if (this.menuMovilAbierto()) this.cerrarMenu();
-    this.menuMovilAbierto.set(false);
   }
 
   toggleBuscador(): void {

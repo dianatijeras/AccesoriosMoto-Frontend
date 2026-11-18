@@ -1,4 +1,4 @@
-import { Component, DestroyRef, signal, inject } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -35,10 +35,6 @@ export class Login {
     contrasena: '',
   });
 
-  constructor() {
-    inject(DestroyRef).onDestroy(() => this.authService.avisoSesionVencida.set(null));
-  }
-
   cambiarModo(registro: boolean): void {
     this.esModoRegistro.set(registro);
     this.error.set(null);
@@ -55,7 +51,6 @@ export class Login {
 
     this.cargando.set(true);
     this.error.set(null);
-    this.authService.avisoSesionVencida.set(null);
 
     this.authService
       .login(this.loginForm.getRawValue())

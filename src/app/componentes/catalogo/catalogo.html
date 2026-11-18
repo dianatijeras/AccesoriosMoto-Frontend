@@ -378,7 +378,7 @@
           <div class="products-grid">
             @for (prod of productos(); track prod.id) {
               @if (prod.estadoPublicacion === 'PUBLICADO' || authService.esAdmin()) {
-                <article class="biker-card card h-100" [class.product-unlisted]="prod.estadoPublicacion !== 'PUBLICADO'">
+                <article class="biker-card" [class.product-unlisted]="prod.estadoPublicacion !== 'PUBLICADO'">
                   <!-- Media & Badges -->
                   <div class="card-media">
                     @if (prod.estadoPublicacion === 'PUBLICADO') {
@@ -471,13 +471,6 @@
                         }
                         <button (click)="eliminar(prod)" class="btn-admin-act btn-delete">Borrar</button>
                       </div>
-                      @if ((prod.tipo === 'Baul' || prod.tipo === 'Visor') && prod.estadoPublicacion !== 'ELIMINADO') {
-                        <div class="admin-panel-strip">
-                          <button type="button" (click)="abrirCompatibilidad(prod)" class="btn-admin-act btn-unpublish">
-                            Compatibilidad
-                          </button>
-                        </div>
-                      }
                     }
                   </div>
                 </article>
@@ -547,35 +540,6 @@
     </main>
   </div>
 
-  @if (authService.esAdmin() && compatibilidadActiva(); as seleccion) {
-    <div class="modal-backdrop" (click)="cerrarCompatibilidad()">
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="compatibilidad-titulo"
-        (click)="$event.stopPropagation()" (keydown.escape)="cerrarCompatibilidad()">
-        <div class="modal-header">
-          <div class="modal-title-wrap">
-            <span class="modal-eyebrow">{{ seleccion.producto.marca }} · {{ seleccion.producto.tipo }}</span>
-            <h2 class="modal-title" id="compatibilidad-titulo">Compatibilidad</h2>
-          </div>
-          <button type="button" class="btn-modal-close" aria-label="Cerrar"
-            [disabled]="guardandoCompatibilidad()" (click)="cerrarCompatibilidad()">×</button>
-        </div>
-        <form class="modal-form" (ngSubmit)="gestionarCompatibilidad()">
-          <div class="form-field">
-            <label for="modelo-compatible" class="field-label">Modelo de {{ seleccion.tipo === 'MOTO' ? 'moto' : 'casco' }}</label>
-            <input id="modelo-compatible" class="form-input form-control" type="text"
-              [formControl]="modeloCompatible" [readOnly]="guardandoCompatibilidad()" required />
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn-cancel btn" (click)="gestionarCompatibilidad(true)"
-              [disabled]="modeloCompatible.invalid || guardandoCompatibilidad()">Retirar</button>
-            <button type="submit" class="btn-submit-product btn"
-              [disabled]="modeloCompatible.invalid || guardandoCompatibilidad()">Registrar</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  }
-
   <!-- MODAL: AGREGAR PRODUCTO (ADMINISTRADOR) -->
   @if (modalCrearAbierto()) {
     <div class="modal-backdrop" (click)="cerrarModalCrear()">
@@ -611,19 +575,19 @@
 
             <div class="form-field">
               <label class="field-label">MARCA</label>
-              <input type="text" formControlName="marcaNombre" class="form-input form-control" required />
+              <input type="text" formControlName="marcaNombre" class="form-input" required />
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-field">
               <label class="field-label">COLOR</label>
-              <input type="text" formControlName="color" class="form-input form-control" required />
+              <input type="text" formControlName="color" class="form-input" required />
             </div>
 
             <div class="form-field">
               <label class="field-label">PRECIO (COP)</label>
-              <input type="number" formControlName="precioMonto" class="form-input form-control" required min="1000" />
+              <input type="number" formControlName="precioMonto" class="form-input" required min="1000" />
             </div>
           </div>
 
@@ -632,11 +596,11 @@
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MODELO</label>
-                <input type="text" formControlName="modelo" class="form-input form-control" placeholder="Ej. K3 SV Racing" required />
+                <input type="text" formControlName="modelo" class="form-input" placeholder="Ej. K3 SV Racing" required />
               </div>
               <div class="form-field">
                 <label class="field-label">TALLA</label>
-                <select formControlName="talla" class="form-input form-select">
+                <select formControlName="talla" class="form-input">
                   @for (t of tallasDisponibles; track t) {
                     <option [value]="t">Talla {{ t }}</option>
                   }
@@ -646,7 +610,7 @@
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">NIVEL DE PROTECCIÓN</label>
-                <select formControlName="proteccion" class="form-input form-select">
+                <select formControlName="proteccion" class="form-input">
                   @for (np of nivelesProteccion; track np.valor) {
                     <option [value]="np.valor">{{ np.label }}</option>
                   }
@@ -654,7 +618,7 @@
               </div>
               <div class="form-field">
                 <label class="field-label">CERTIFICACIÓN</label>
-                <input type="text" formControlName="certificacionSeguridad" class="form-input form-control" placeholder="ECE 22.06 / DOT" required />
+                <input type="text" formControlName="certificacionSeguridad" class="form-input" placeholder="ECE 22.06 / DOT" required />
               </div>
             </div>
           }
@@ -664,7 +628,7 @@
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MATERIAL</label>
-                <select formControlName="material" class="form-input form-select">
+                <select formControlName="material" class="form-input">
                   @for (m of materiales; track m.valor) {
                     <option [value]="m.valor">{{ m.label }}</option>
                   }
@@ -672,7 +636,7 @@
               </div>
               <div class="form-field">
                 <label class="field-label">TALLA</label>
-                <select formControlName="talla" class="form-input form-select">
+                <select formControlName="talla" class="form-input">
                   @for (t of tallasDisponibles; track t) {
                     <option [value]="t">Talla {{ t }}</option>
                   }
@@ -681,7 +645,7 @@
             </div>
             <div class="form-field">
               <label class="field-label">NIVEL DE PROTECCIÓN</label>
-              <select formControlName="proteccion" class="form-input form-select">
+              <select formControlName="proteccion" class="form-input">
                 @for (np of nivelesProteccion; track np.valor) {
                   <option [value]="np.valor">{{ np.label }}</option>
                 }
@@ -694,7 +658,7 @@
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MATERIAL</label>
-                <select formControlName="material" class="form-input form-select">
+                <select formControlName="material" class="form-input">
                   @for (m of materiales; track m.valor) {
                     <option [value]="m.valor">{{ m.label }}</option>
                   }
@@ -702,7 +666,7 @@
               </div>
               <div class="form-field">
                 <label class="field-label">TALLA</label>
-                <select formControlName="talla" class="form-input form-select">
+                <select formControlName="talla" class="form-input">
                   @for (t of tallasDisponibles; track t) {
                     <option [value]="t">Talla {{ t }}</option>
                   }
@@ -716,7 +680,7 @@
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">MATERIAL</label>
-                <select formControlName="material" class="form-input form-select">
+                <select formControlName="material" class="form-input">
                   @for (m of materiales; track m.valor) {
                     <option [value]="m.valor">{{ m.label }}</option>
                   }
@@ -724,17 +688,17 @@
               </div>
               <div class="form-field">
                 <label class="field-label">CAPACIDAD (LITROS)</label>
-                <input type="number" formControlName="capacidadLitros" class="form-input form-control" min="1" />
+                <input type="number" formControlName="capacidadLitros" class="form-input" min="1" />
               </div>
             </div>
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">CARGA MÁXIMA (KG)</label>
-                <input type="number" formControlName="capacidadMaximaCarga" class="form-input form-control" min="1" />
+                <input type="number" formControlName="capacidadMaximaCarga" class="form-input" min="1" />
               </div>
               <div class="form-field">
                 <label class="field-label">DIMENSIONES</label>
-                <input type="text" formControlName="dimensiones" class="form-input form-control" placeholder="45x40x32 cm" />
+                <input type="text" formControlName="dimensiones" class="form-input" placeholder="45x40x32 cm" />
               </div>
             </div>
           }
@@ -744,16 +708,16 @@
             <div class="form-row">
               <div class="form-field">
                 <label class="field-label">ALCANCE (METROS)</label>
-                <input type="number" formControlName="alcanceMetros" class="form-input form-control" min="10" />
+                <input type="number" formControlName="alcanceMetros" class="form-input" min="10" />
               </div>
               <div class="form-field">
                 <label class="field-label">AUTONOMÍA (HORAS)</label>
-                <input type="number" formControlName="autonomiaHoras" class="form-input form-control" min="1" />
+                <input type="number" formControlName="autonomiaHoras" class="form-input" min="1" />
               </div>
             </div>
             <div class="form-field">
               <label class="field-label">TECNOLOGÍA BLUETOOTH</label>
-              <select formControlName="bluetooth" class="form-input form-select">
+              <select formControlName="bluetooth" class="form-input">
                 <option [ngValue]="true">Sí (Bluetooth Integrado)</option>
                 <option [ngValue]="false">No (Solo conexión cable / análoga)</option>
               </select>
@@ -764,7 +728,7 @@
           @if (productoForm.controls.tipo.value === 'SoporteCelular') {
             <div class="form-field">
               <label class="field-label">TIPO DE SUJECIÓN</label>
-              <input type="text" formControlName="tipoSujecion" class="form-input form-control" placeholder="Manubrio, Espejo retrovisor" />
+              <input type="text" formControlName="tipoSujecion" class="form-input" placeholder="Manubrio, Espejo retrovisor" />
             </div>
           }
 
@@ -772,7 +736,7 @@
           @if (productoForm.controls.tipo.value === 'Visor') {
             <div class="form-field">
               <label class="field-label">TIPO DE VISOR</label>
-              <input type="text" formControlName="tipoVisor" class="form-input form-control" placeholder="Transparente, Humo oscuro, Iridium Azul" />
+              <input type="text" formControlName="tipoVisor" class="form-input" placeholder="Transparente, Humo oscuro, Iridium Azul" />
             </div>
           }
 
@@ -873,8 +837,8 @@
           </div>
 
           <div class="modal-footer">
-            <button type="button" (click)="cerrarModalCrear()" class="btn-cancel btn">Cancelar</button>
-            <button type="submit" [disabled]="productoForm.invalid || guardandoProducto()" class="btn-submit-product btn">
+            <button type="button" (click)="cerrarModalCrear()" class="btn-cancel">Cancelar</button>
+            <button type="submit" [disabled]="productoForm.invalid || guardandoProducto()" class="btn-submit-product">
               {{ guardandoProducto() ? 'Guardando en BD...' : 'Crear Producto en Backend' }}
             </button>
           </div>
@@ -883,3 +847,4 @@
     </div>
   }
 </div>
+

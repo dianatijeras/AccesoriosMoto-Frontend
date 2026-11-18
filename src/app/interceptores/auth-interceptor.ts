@@ -2,18 +2,21 @@ import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../servicios/auth';
+import { AvisosService } from '../servicios/avisos';
 import { catchError, throwError } from 'rxjs';
+
+const mensajeSesionVencida = 'Tu sesión venció. Inicia sesión nuevamente.';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const ruta = req.url.split(/[?#]/, 1)[0];
   if (/\/api\/auth\/(login|registro)\/?$/.test(ruta)) {
     return next(req);
   }
-  
 
   const authService = inject(AuthService);
+  const avisos = inject(AvisosService);
   const router = inject(Router);
-  const token = <SECRET>();
+  const token = authService.getToken();
   const sesion = authService.sesion();
   const consultaPublica = req.method === 'GET' && /\/api\/productos(?:\/|$)/.test(ruta);
   const solicitud = token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
@@ -31,9 +34,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return next(req.clone({ headers: req.headers.delete('Authorization') }));
       }
 
-      if ((!sesionActual || sesionActual === sesion) && !authService.avisoSesionVencida()) {
+      if (
+        sesionActual
+          ? sesionActual === sesion
+          : !avisos.avisos().some((aviso) => aviso.mensaje === mensajeSesionVencida)
+      ) {
         authService.logout();
-        authService.avisoSesionVencida.set('Tu sesión venció. Inicia sesión nuevamente.');
+        avisos.error(mensajeSesionVencida);
         void router.navigate(['/login'], { replaceUrl: true });
       }
       return throwError(() => error);
