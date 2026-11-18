@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, signal, inject } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { CatalogoService } from '../../servicios/catalogo';
@@ -25,7 +25,28 @@ export class Inicio implements OnInit {
   destacados = signal<ProductoResponse[]>([]);
   cargando = signal<boolean>(false);
 
-  readonly marcas = computed(() => this.catalogoService.opcionesCatalogo('marca'));
+  marcas = [
+    'AGV',
+    'LS2',
+    'Shoei',
+    'HJC',
+    'Bell',
+    'Shark',
+    'Alpinestars',
+    'Dainese',
+    'Revit',
+    'Givi',
+    'Shad',
+    'Kappa',
+    'Cardo',
+    'Sena',
+    'FreedConn',
+    'Quad Lock',
+    'RAM Mounts',
+    'Motowolf',
+    'Rainwear',
+    'Cyclone',
+  ];
 
   ngOnInit(): void {
     this.cargando.set(true);
