@@ -23,32 +23,32 @@
         <button
           type="button"
           class="cat-tab-btn"
-          [class.active]="categoriaActiva() === 'CASCOS'"
-          (click)="cambiarCategoria('CASCOS')"
+          disabled
+          title="El catálogo no admite filtrar por categoría"
         >
           CASCOS
         </button>
         <button
           type="button"
           class="cat-tab-btn"
-          [class.active]="categoriaActiva() === 'TEXTIL'"
-          (click)="cambiarCategoria('TEXTIL')"
+          disabled
+          title="El catálogo no admite filtrar por categoría"
         >
           TEXTIL (CHAQUETAS & GUANTES)
         </button>
         <button
           type="button"
           class="cat-tab-btn"
-          [class.active]="categoriaActiva() === 'ACCESORIOS'"
-          (click)="cambiarCategoria('ACCESORIOS')"
+          disabled
+          title="El catálogo no admite filtrar por categoría"
         >
           ACCESORIOS & INTERCOM
         </button>
         <button
           type="button"
           class="cat-tab-btn"
-          [class.active]="categoriaActiva() === 'REPUESTOS'"
-          (click)="cambiarCategoria('REPUESTOS')"
+          disabled
+          title="El catálogo no admite filtrar por categoría"
         >
           REPUESTOS & VISORES
         </button>
@@ -319,7 +319,7 @@
             Mostrando <strong>{{ productos().length }}</strong> de <strong>{{ totalElementos() }}</strong> accesorios
           </span>
           <span class="page-indicator-pill">
-            Página {{ pagina() + 1 }} de {{ totalPaginas() }}
+            Página {{ totalPaginas() ? pagina() + 1 : 0 }} de {{ totalPaginas() }}
           </span>
         </div>
 
@@ -333,7 +333,7 @@
               class="page-size-select"
             >
               @for (s of tamanosDisponibles; track s) {
-                <option [value]="s">{{ s }} / pág</option>
+                <option [ngValue]="s">{{ s }} / pág</option>
               }
             </select>
           </div>
